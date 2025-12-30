@@ -1,0 +1,12 @@
+{
+    "display_name": "Image Router",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Claude Code",
+    "version": "1.0.0",
+    "homePage": "https://github.com/lianwusuoai/img-router",
+    "description": "SillyTavern extension for img-router API - supports text-to-image and image-to-image generation"
+}
