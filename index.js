@@ -1,4 +1,4 @@
-// Image Router Extension for SillyTavern
+﻿// Image Router Extension for SillyTavern
 // Supports text-to-image, image-to-image, history gallery, prompt prefix, fixed reference mode
 // Update: Added support for Raw Base64 responses (Auto-prefixing)
 
@@ -262,6 +262,16 @@ async function generateImage(prompt, referenceImages = null) {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let rawBuffer = '';
+            let lineBuffer = '';
+
+            const appendDelta = (dataLine) => {
+                if (!dataLine || dataLine === '[DONE]') return;
+                try {
+                    const json = JSON.parse(dataLine);
+                    const delta = json.choices?.[0]?.delta?.content;
+                    if (delta) content += delta;
+                } catch (e) {}
+            };
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -269,33 +279,53 @@ async function generateImage(prompt, referenceImages = null) {
                 
                 const chunk = decoder.decode(value, { stream: true });
                 rawBuffer += chunk;
-                
-                const lines = chunk.split('\n');
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.substring(6).trim();
-                        if (data === '[DONE]') continue;
-                        try {
-                            const json = JSON.parse(data);
-                            const delta = json.choices?.[0]?.delta?.content;
-                            if (delta) content += delta;
-                        } catch (e) {}
-                    }
+                lineBuffer += chunk;
+
+                let newlineIndex;
+                while ((newlineIndex = lineBuffer.indexOf('\n')) !== -1) {
+                    const line = lineBuffer.slice(0, newlineIndex).trim();
+                    lineBuffer = lineBuffer.slice(newlineIndex + 1);
+
+                    if (!line.startsWith('data:')) continue;
+                    const data = line.replace(/^data:\s*/, '');
+                    appendDelta(data);
                 }
             }
+
+            const remaining = lineBuffer.trim();
+            if (remaining.startsWith('data:')) {
+                const data = remaining.replace(/^data:\s*/, '');
+                appendDelta(data);
+            }
             
-            // 如果流解析为空，尝试解析整个 Buffer (针对 Base64)
+            // 如果流解析为空，尝试解析整个 Buffer
             if (!content && rawBuffer.length > 0) {
-                console.log('[img-router] Stream parsing empty, checking raw buffer for Base64...');
-                try {
-                    const json = JSON.parse(rawBuffer);
-                    // 尝试提取常见字段
-                    content = json.choices?.[0]?.message?.content || 
-                              json.b64_json || 
-                              (json.images && json.images[0]) || 
-                              JSON.stringify(json);
-                } catch(e) {
-                    content = rawBuffer; // 直接使用原始内容
+                console.log('[img-router] Stream parsing empty, checking raw buffer...');
+                const fallbackLines = rawBuffer.split('\n');
+                for (const line of fallbackLines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith('data:')) continue;
+                    const data = trimmed.replace(/^data:\s*/, '');
+                    appendDelta(data);
+                }
+
+                if (!content) {
+                    let parsedError = null;
+                    try {
+                        const json = JSON.parse(rawBuffer);
+                        if (json?.error) {
+                            parsedError = json.error.message || json.error.error || JSON.stringify(json.error);
+                        } else {
+                            content = json.choices?.[0]?.message?.content || 
+                                      json.b64_json || 
+                                      (json.images && json.images[0]) || 
+                                      (json.data && (json.data[0]?.b64_json || json.data[0]?.url)) ||
+                                      JSON.stringify(json);
+                        }
+                    } catch (e) {
+                        content = rawBuffer.trim();
+                    }
+                    if (parsedError) throw new Error(parsedError);
                 }
             }
         } else {
@@ -371,22 +401,27 @@ function processChatMessages() {
         
         if (!isEnabled) return;
 
-        if (textContainer.find('.img-router-inline-trigger, .img-router-inline-result').length > 0) {
-            bindInlineEvents(textContainer);
+        const html = textContainer.html();
+        const hasPlaceholder = /image###([\s\S]+?)###/.test(html);
+
+        if (!hasPlaceholder) {
+            if (textContainer.find('.img-router-inline-trigger, .img-router-inline-result').length > 0) {
+                bindInlineEvents(textContainer);
+            }
             return;
         }
 
-        let html = textContainer.html();
         const regex = /image###([\s\S]+?)###/g;
 
-        if (regex.test(html)) {
-            const newHtml = html.replace(regex, (match, prompt) => {
-                const safePrompt = prompt.replace(/"/g, '&quot;');
-                return `<span class="img-router-inline-trigger" data-prompt="${safePrompt}" title="点击生成: ${safePrompt}">[生成图片]</span>`;
-            });
+        const newHtml = html.replace(regex, (match, prompt) => {
+            const safePrompt = prompt.replace(/"/g, '&quot;');
+            return `<span class="img-router-inline-trigger" data-prompt="${safePrompt}" title="点击生成: ${safePrompt}">[生成图片]</span>`;
+        });
+
+        if (newHtml !== html) {
             textContainer.html(newHtml);
-            bindInlineEvents(textContainer);
         }
+        bindInlineEvents(textContainer);
     });
 }
 
@@ -739,17 +774,38 @@ jQuery(async () => {
                             <label>模型</label>
                             <select id="img-router-model" class="img-router-input">
                                 <option value="">默认 (自动)</option>
-                                <optgroup label="火山引擎"><option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option></optgroup>
-                                <optgroup label="Gitee"><option value="z-image-turbo">z-image-turbo</option><option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option></optgroup>
+                                <optgroup label="火山引擎">
+                                    <option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option>
+                                    <option value="doubao-seedream-4-0-250828">doubao-seedream-4-0-250828</option>
+                                </optgroup>
+                                <optgroup label="Gitee">
+                                    <option value="z-image-turbo">z-image-turbo</option>
+                                    <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
+                                    <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
+                                    <option value="FLUX.1-Kontext-dev">FLUX.1-Kontext-dev</option>
+                                </optgroup>
+                                <optgroup label="ModelScope">
+                                    <option value="Tongyi-MAI/Z-Image-Turbo">Tongyi-MAI/Z-Image-Turbo</option>
+                                    <option value="Qwen/Qwen-Image-Edit-2511">Qwen/Qwen-Image-Edit-2511</option>
+                                </optgroup>
+                                <optgroup label="HuggingFace">
+                                    <option value="z-image-turbo">z-image-turbo</option>
+                                    <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="img-router-field">
                             <label>尺寸</label>
                             <select id="img-router-size" class="img-router-input">
                                 <option value="">默认</option>
+                                <option value="512x512">512x512</option>
+                                <option value="768x768">768x768</option>
                                 <option value="1024x1024">1024x1024</option>
                                 <option value="768x1024">768x1024</option>
                                 <option value="1024x768">1024x768</option>
+                                <option value="1328x1328">1328x1328</option>
+                                <option value="2048x2048">2048x2048</option>
+                                <option value="2K">2K</option>
                             </select>
                         </div>
                         <label><input type="checkbox" id="img-router-stream" checked /> 流式响应</label>
