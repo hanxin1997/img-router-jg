@@ -71,6 +71,22 @@ function fileToBase64(file) {
     });
 }
 
+function normalizeApiUrl(rawUrl) {
+    let url = (rawUrl || '').trim();
+    if (!url) return '';
+    url = url.replace(/\/+$/, '');
+    return url.replace(/\/v1(?:\/.*)?$/i, '');
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ================= 参考图片 (图生图) 逻辑 =================
 
 function updateImagePreviews() {
@@ -151,8 +167,9 @@ function renderHistoryGallery() {
     }
 
     history.forEach((item, index) => {
+        const safeTitle = escapeHtml(`${item.prompt} (${item.time})`);
         const div = $(`
-            <div class="history-item" title="${item.prompt} (${item.time})">
+            <div class="history-item" title="${safeTitle}">
                 <img src="${item.url}" class="zoomable" onclick="clickZoom(this)" />
                 <div class="history-actions">
                     <i class="fa-solid fa-download" onclick="const a=document.createElement('a');a.href='${item.url}';a.download='history_${index}.png';a.click();"></i>
@@ -184,14 +201,24 @@ function clearHistory() {
 
 async function testConnection() {
     const statusEl = $('#img-router-connection-status');
-    const apiUrl = $('#img-router-api-url').val().trim();
+    const apiUrl = normalizeApiUrl($('#img-router-api-url').val());
     if (!apiUrl) return toastr.error('请输入 API 地址');
 
     statusEl.html('<i class="fa-solid fa-spinner fa-spin"></i> Testing...');
     try {
         const response = await fetch(`${apiUrl}/health`);
-        if (response.ok) statusEl.html('<span style="color:#4caf50">连接成功</span>');
-        else statusEl.html(`<span style="color:#f44336">错误: ${response.status}</span>`);
+        if (response.ok) {
+            statusEl.html('<span style="color:#4caf50">连接成功</span>');
+            return;
+        }
+
+        const uiResponse = await fetch(`${apiUrl}/api/health`).catch(() => null);
+        if (uiResponse && (uiResponse.ok || uiResponse.status === 401)) {
+            statusEl.html('<span style="color:#f44336">当前是管理端口，请使用 API 端口 (默认 10001)</span>');
+            return;
+        }
+
+        statusEl.html(`<span style="color:#f44336">错误: ${response.status}</span>`);
     } catch (error) {
         statusEl.html('<span style="color:#f44336">连接失败</span>');
     }
@@ -213,11 +240,11 @@ async function generateImage(prompt, referenceImages = null) {
     }
 
     const settings = extension_settings[extensionName];
-    const apiUrl = settings.apiUrl;
+    const apiUrl = normalizeApiUrl(settings.apiUrl);
     const apiKey = settings.apiKey;
 
     if (!apiUrl || !apiKey) {
-        toastr.error('请先配置 API 地址和密钥');
+        toastr.error('请先配置 API 地址和访问令牌');
         return null;
     }
 
@@ -252,8 +279,14 @@ async function generateImage(prompt, referenceImages = null) {
         });
 
         if (!response.ok) {
-            const txt = await response.text();
-            throw new Error(`API Error ${response.status}: ${txt}`);
+            let message = '';
+            try {
+                const data = await response.json();
+                message = data?.error?.message || data?.error || JSON.stringify(data);
+            } catch {
+                message = await response.text();
+            }
+            throw new Error(`API Error ${response.status}: ${message}`);
         }
 
         let content = '';
@@ -514,8 +547,8 @@ function injectCustomStyles() {
             align-items: flex-start; 
             justify-content: center;
             overflow-y: auto;
-            padding-top: 120px;
-            padding-bottom: 80px;
+            padding: 16px;
+            box-sizing: border-box;
         }
         #img-router-modal-overlay:not(.active) { display: none !important; }
         
@@ -524,6 +557,8 @@ function injectCustomStyles() {
             border-radius: 12px; 
             width: 90%; 
             max-width: 550px; 
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
             margin: 0; 
             box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
             border: 1px solid var(--SmartThemeBorderColor, #444); 
@@ -553,10 +588,12 @@ function injectCustomStyles() {
         .history-item:hover .history-actions { opacity: 1; }
         .history-actions i { color: white; cursor: pointer; font-size: 12px; }
         .history-actions i:hover { color: #3b82f6; }
+
+        #img-router-modal-close { top: 8px; right: 8px; }
         
         @media (max-width: 768px) {
             #img-router-modal { width: 95%; }
-            #img-router-modal-close { top: -15px; right: -5px; }
+            #img-router-modal-close { top: 8px; right: 8px; }
             .img-router-input { font-size: 16px; }
         }
     `;
@@ -735,7 +772,7 @@ jQuery(async () => {
         modalOverlay.id = 'img-router-modal-overlay';
         modalOverlay.innerHTML = `
             <div id="img-router-modal">
-                <button id="img-router-modal-close" style="position: absolute; top: -15px; right: -10px; width: 36px; height: 36px; border-radius: 50%; background: #f44336; color: white; border: 2px solid white; cursor: pointer; z-index: 20001; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fa-solid fa-times"></i></button>
+                <button id="img-router-modal-close" style="position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 50%; background: #f44336; color: white; border: 2px solid white; cursor: pointer; z-index: 20001; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fa-solid fa-times"></i></button>
                 <div id="img-router-modal-content" style="padding: 15px;">
                     <div class="img-router-header">
                         <h3 style="margin:0;">🎨 图像生成器 <span style="font-size:0.6em; opacity:0.7;">v2.4.0</span></h3>
@@ -757,8 +794,9 @@ jQuery(async () => {
                             <input type="text" id="img-router-api-url" class="img-router-input" placeholder="http://127.0.0.1:10001" />
                         </div>
                         <div class="img-router-field">
-                            <label>API 密钥</label>
-                            <input type="text" id="img-router-api-key" class="img-router-input" placeholder="请输入 API Key" />
+                            <label>访问令牌</label>
+                            <input type="text" id="img-router-api-key" class="img-router-input" placeholder="请输入 accessToken" />
+                            <small style="opacity:0.7;">请在 img-router 管理后台创建访问令牌</small>
                         </div>
                         <button id="img-router-test-connection" class="menu_button">测试连接</button>
                         <span id="img-router-connection-status" style="margin-left:10px;"></span>

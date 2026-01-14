@@ -51,7 +51,10 @@
     z-index: 100000 !important;
     display: none !important;
     justify-content: center !important;
-    align-items: center !important;
+    align-items: flex-start !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
 }
 
 #img-router-modal-overlay.active {
@@ -64,7 +67,7 @@
     border-radius: 12px;
     width: 90%;
     max-width: 500px;
-    max-height: 85vh;
+    max-height: calc(100vh - 32px);
     overflow-y: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     border: 1px solid var(--SmartThemeBorderColor, #333);
@@ -479,8 +482,8 @@
     #img-router-modal {
         width: 95%;
         max-width: none;
-        max-height: 90vh;
-        margin: 10px;
+        max-height: calc(100vh - 24px);
+        margin: 12px;
     }
 
     .img-router-panel {
@@ -546,8 +549,8 @@
 
     #img-router-modal {
         width: 100%;
-        max-height: 95vh;
-        margin: 5px;
+        max-height: calc(100vh - 16px);
+        margin: 8px;
         border-radius: 8px;
     }
 

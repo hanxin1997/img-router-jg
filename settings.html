@@ -9,12 +9,12 @@
         <div class="img-router-field">
             <label for="img-router-api-url">服务器地址</label>
             <input type="text" id="img-router-api-url" placeholder="http://127.0.0.1:10001" />
-            <small>img-router 后端服务地址</small>
+            <small>img-router 后端服务地址（不要加 /v1）</small>
         </div>
         <div class="img-router-field">
-            <label for="img-router-api-key">API 密钥</label>
-            <input type="password" id="img-router-api-key" placeholder="请输入 API Key" />
-            <small>根据格式自动识别: hf_* (HuggingFace), ms-* (ModelScope), UUID (火山引擎), 30-60字符 (Gitee)</small>
+            <label for="img-router-api-key">访问令牌</label>
+            <input type="password" id="img-router-api-key" placeholder="请输入 accessToken" />
+            <small>请在 img-router 管理后台创建访问令牌 (accessToken)</small>
         </div>
         <div class="img-router-field">
             <button id="img-router-test-connection" class="menu_button">测试连接</button>
