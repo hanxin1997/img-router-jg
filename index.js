@@ -9,6 +9,7 @@ import {
 } from '../../../../script.js';
 
 import { extension_settings, getContext } from '../../../extensions.js';
+import { Popup, POPUP_TYPE } from '../../../popup.js';
 
 const extensionName = 'img-router';
 
@@ -699,37 +700,141 @@ function setupEventHandlers() {
 function toggleModal() {
     const overlay = document.getElementById('img-router-modal-overlay');
     if (overlay) {
-        const isOpening = !overlay.classList.contains('active');
-
-        if (isOpening) {
-            // 打开 modal 时，临时隐藏可能遮挡的酒馆 UI 元素
-            const elementsToHide = [
-                '#top-bar',
-                '#sheld',
-                '#left-nav-panel',
-                '#right-nav-panel',
-                '.drawer-content',
-                '#floatingPrompt',
-                '#send_form',
-                '#form_sheld'
-            ];
-            elementsToHide.forEach(selector => {
-                const el = document.querySelector(selector);
-                if (el) {
-                    el.dataset.imgRouterHidden = el.style.visibility || '';
-                    el.style.visibility = 'hidden';
-                }
-            });
-            overlay.classList.add('active');
-        } else {
-            // 关闭 modal 时，恢复隐藏的元素
-            document.querySelectorAll('[data-img-router-hidden]').forEach(el => {
-                el.style.visibility = el.dataset.imgRouterHidden || '';
-                delete el.dataset.imgRouterHidden;
-            });
-            overlay.classList.remove('active');
-        }
+        overlay.classList.toggle('active');
     }
+}
+
+// 使用酒馆原生 Popup 显示设置界面
+let currentPopup = null;
+async function showSettingsPopup() {
+    if (currentPopup) {
+        return; // 已经打开了
+    }
+
+    const content = getModalContent();
+    currentPopup = new Popup(content, POPUP_TYPE.TEXT, '', {
+        wide: true,
+        large: true,
+        okButton: false,
+        cancelButton: false,
+    });
+
+    currentPopup.show().then(() => {
+        currentPopup = null;
+    });
+
+    // 等待 DOM 渲染后绑定事件
+    await new Promise(r => setTimeout(r, 100));
+    loadSettings();
+    setupEventHandlers();
+    renderHistory();
+    renderPreviewImages();
+}
+
+function getModalContent() {
+    return `
+        <div class="img-router-panel">
+            <div class="img-router-header">
+                <h3 style="margin:0;">🎨 图像生成器 <span style="font-size:0.6em; opacity:0.7;">v2.4.0</span></h3>
+            </div>
+
+            <div class="img-router-section" style="display:flex; align-items:center; justify-content:space-between; background:rgba(59, 130, 246, 0.1); border-color:#3b82f6;">
+                <span style="font-weight:bold;">启用聊天内联生成</span>
+                <label class="switch" style="margin:0;">
+                    <input type="checkbox" id="img-router-enable-inline" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="img-router-section">
+                <h4>🔗 API 配置</h4>
+                <div class="img-router-field">
+                    <label>服务器地址</label>
+                    <input type="text" id="img-router-api-url" class="img-router-input text_pole" placeholder="http://127.0.0.1:10001" />
+                </div>
+                <div class="img-router-field">
+                    <label>访问令牌</label>
+                    <input type="text" id="img-router-api-key" class="img-router-input text_pole" placeholder="请输入 accessToken" />
+                    <small style="opacity:0.7;">请在 img-router 管理后台创建访问令牌</small>
+                </div>
+                <button id="img-router-test-connection" class="menu_button">测试连接</button>
+                <span id="img-router-connection-status" style="margin-left:10px;"></span>
+            </div>
+
+            <div class="img-router-section">
+                <h4>⚙️ 生成设置</h4>
+                <div class="img-router-field">
+                    <label>提示词前缀 (自动添加到提示词开头)</label>
+                    <textarea id="img-router-prefix" class="img-router-input text_pole" rows="2" placeholder="例如: high quality, masterpiece, 8k"></textarea>
+                </div>
+                <div class="img-router-field">
+                    <label>模型</label>
+                    <select id="img-router-model" class="img-router-input text_pole">
+                        <option value="">默认 (自动)</option>
+                        <optgroup label="火山引擎">
+                            <option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option>
+                            <option value="doubao-seedream-4-0-250828">doubao-seedream-4-0-250828</option>
+                        </optgroup>
+                        <optgroup label="Gitee">
+                            <option value="z-image-turbo">z-image-turbo</option>
+                            <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
+                            <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
+                            <option value="FLUX.1-Kontext-dev">FLUX.1-Kontext-dev</option>
+                        </optgroup>
+                        <optgroup label="ModelScope">
+                            <option value="Tongyi-MAI/Z-Image-Turbo">Tongyi-MAI/Z-Image-Turbo</option>
+                            <option value="Qwen/Qwen-Image-Edit-2511">Qwen/Qwen-Image-Edit-2511</option>
+                        </optgroup>
+                        <optgroup label="HuggingFace">
+                            <option value="z-image-turbo">z-image-turbo</option>
+                            <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="img-router-field">
+                    <label>尺寸</label>
+                    <select id="img-router-size" class="img-router-input text_pole">
+                        <option value="">默认</option>
+                        <option value="512x512">512x512</option>
+                        <option value="768x768">768x768</option>
+                        <option value="1024x1024">1024x1024</option>
+                        <option value="768x1024">768x1024</option>
+                        <option value="1024x768">1024x768</option>
+                        <option value="1328x1328">1328x1328</option>
+                        <option value="2048x2048">2048x2048</option>
+                        <option value="2K">2K</option>
+                    </select>
+                </div>
+                <label><input type="checkbox" id="img-router-stream" checked /> 流式响应</label>
+            </div>
+
+            <div class="img-router-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0;">🖼️ 参考图片 (图生图)</h4>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <label style="font-size:0.9em; cursor:pointer; display:flex; align-items:center;">
+                            <input type="checkbox" id="img-router-fix-ref" style="margin-right:4px;" /> 固定此图
+                        </label>
+                        <small id="img-router-clear-images" style="cursor:pointer; color:#f44336; display:none;">清除</small>
+                    </div>
+                </div>
+                <label id="img-router-upload-area" class="img-router-upload-zone" for="img-router-file-input">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2em; margin-bottom: 5px;"></i>
+                    <p style="margin:0">点击或拖拽上传图片</p>
+                </label>
+                <input type="file" id="img-router-file-input" accept="image/*" multiple style="display:none;" />
+                <div id="img-router-preview-container" class="img-router-preview-list"></div>
+            </div>
+
+            <div class="img-router-section">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h4>📜 历史生成 (最近20张)</h4>
+                    <small id="img-router-clear-history" style="cursor:pointer; color:#f44336;">清空历史</small>
+                </div>
+                <div id="img-router-history-container"></div>
+            </div>
+        </div>
+    `;
 }
 
 function initFabDrag(fabElement) {
@@ -842,142 +947,25 @@ jQuery(async () => {
         console.log('[img-router] Init...');
         injectCustomStyles();
 
+        // 创建 FAB 按钮
         const fab = document.createElement('button');
         fab.id = 'img-router-fab';
         fab.innerHTML = '<i class="fa-solid fa-images"></i>';
         fab.style.cssText = `position: fixed; bottom: 150px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; cursor: grab; z-index: 99999; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); border: none; color: white; font-size: 24px; -webkit-tap-highlight-color: transparent; touch-action: none;`;
         document.body.appendChild(fab);
 
-        const modalOverlay = document.createElement('div');
-        modalOverlay.id = 'img-router-modal-overlay';
-        modalOverlay.innerHTML = `
-            <div id="img-router-modal">
-                <button id="img-router-modal-close" style="position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 50%; background: #f44336; color: white; border: 2px solid white; cursor: pointer; z-index: 20001; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fa-solid fa-times"></i></button>
-                <div id="img-router-modal-content" style="padding: 15px;">
-                    <div class="img-router-header">
-                        <h3 style="margin:0;">🎨 图像生成器 <span style="font-size:0.6em; opacity:0.7;">v2.4.0</span></h3>
-                        <small style="opacity:0.6; font-size:0.7em;">按住此处可拖动</small>
-                    </div>
-                    
-                    <div class="img-router-section" style="display:flex; align-items:center; justify-content:space-between; background:rgba(59, 130, 246, 0.1); border-color:#3b82f6;">
-                        <span style="font-weight:bold;">启用聊天内联生成</span>
-                        <label class="switch" style="margin:0;">
-                            <input type="checkbox" id="img-router-enable-inline" checked>
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
-
-                    <div class="img-router-section">
-                        <h4>🔗 API 配置</h4>
-                        <div class="img-router-field">
-                            <label>服务器地址</label>
-                            <input type="text" id="img-router-api-url" class="img-router-input" placeholder="http://127.0.0.1:10001" />
-                        </div>
-                        <div class="img-router-field">
-                            <label>访问令牌</label>
-                            <input type="text" id="img-router-api-key" class="img-router-input" placeholder="请输入 accessToken" />
-                            <small style="opacity:0.7;">请在 img-router 管理后台创建访问令牌</small>
-                        </div>
-                        <button id="img-router-test-connection" class="menu_button">测试连接</button>
-                        <span id="img-router-connection-status" style="margin-left:10px;"></span>
-                    </div>
-                    
-                    <div class="img-router-section">
-                        <h4>⚙️ 生成设置</h4>
-                        <div class="img-router-field">
-                            <label>提示词前缀 (自动添加到提示词开头)</label>
-                            <textarea id="img-router-prefix" class="img-router-input" rows="2" placeholder="例如: high quality, masterpiece, 8k"></textarea>
-                        </div>
-                        <div class="img-router-field">
-                            <label>模型</label>
-                            <select id="img-router-model" class="img-router-input">
-                                <option value="">默认 (自动)</option>
-                                <optgroup label="火山引擎">
-                                    <option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option>
-                                    <option value="doubao-seedream-4-0-250828">doubao-seedream-4-0-250828</option>
-                                </optgroup>
-                                <optgroup label="Gitee">
-                                    <option value="z-image-turbo">z-image-turbo</option>
-                                    <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
-                                    <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
-                                    <option value="FLUX.1-Kontext-dev">FLUX.1-Kontext-dev</option>
-                                </optgroup>
-                                <optgroup label="ModelScope">
-                                    <option value="Tongyi-MAI/Z-Image-Turbo">Tongyi-MAI/Z-Image-Turbo</option>
-                                    <option value="Qwen/Qwen-Image-Edit-2511">Qwen/Qwen-Image-Edit-2511</option>
-                                </optgroup>
-                                <optgroup label="HuggingFace">
-                                    <option value="z-image-turbo">z-image-turbo</option>
-                                    <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
-                                </optgroup>
-                            </select>
-                        </div>
-                        <div class="img-router-field">
-                            <label>尺寸</label>
-                            <select id="img-router-size" class="img-router-input">
-                                <option value="">默认</option>
-                                <option value="512x512">512x512</option>
-                                <option value="768x768">768x768</option>
-                                <option value="1024x1024">1024x1024</option>
-                                <option value="768x1024">768x1024</option>
-                                <option value="1024x768">1024x768</option>
-                                <option value="1328x1328">1328x1328</option>
-                                <option value="2048x2048">2048x2048</option>
-                                <option value="2K">2K</option>
-                            </select>
-                        </div>
-                        <label><input type="checkbox" id="img-router-stream" checked /> 流式响应</label>
-                    </div>
-
-                    <div class="img-router-section">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                            <h4 style="margin:0;">🖼️ 参考图片 (图生图)</h4>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <label style="font-size:0.9em; cursor:pointer; display:flex; align-items:center;">
-                                    <input type="checkbox" id="img-router-fix-ref" style="margin-right:4px;" /> 固定此图
-                                </label>
-                                <small id="img-router-clear-images" style="cursor:pointer; color:#f44336; display:none;">清除</small>
-                            </div>
-                        </div>
-                        <label id="img-router-upload-area" class="img-router-upload-zone" for="img-router-file-input">
-                            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2em; margin-bottom: 5px;"></i>
-                            <p style="margin:0">点击或拖拽上传图片</p>
-                        </label>
-                        <input type="file" id="img-router-file-input" accept="image/*" multiple style="display:none;" />
-                        <div id="img-router-preview-container" class="img-router-preview-list"></div>
-                    </div>
-
-                    <div class="img-router-section">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <h4>📜 历史生成 (最近20张)</h4>
-                            <small id="img-router-clear-history" style="cursor:pointer; color:#f44336;">清空历史</small>
-                        </div>
-                        <div id="img-router-history-container"></div>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modalOverlay);
-
+        // 点击 FAB 使用酒馆原生 Popup
         fab.addEventListener('click', function() {
-            if (this.dataset.dragging !== 'true') toggleModal();
+            if (this.dataset.dragging !== 'true') showSettingsPopup();
         });
 
-        // 关闭按钮和点击遮罩层都调用 toggleModal 以正确恢复隐藏的元素
-        document.getElementById('img-router-modal-close').onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleModal();
-        };
-        modalOverlay.onclick = (e) => {
-            if (e.target === modalOverlay) toggleModal();
-        };
-
         initFabDrag(fab);
-        initModalDrag();
-        loadSettings();
-        setupEventHandlers();
-        
+
+        // 初始化设置（不需要等待 modal）
+        if (!extension_settings[extensionName]) {
+            extension_settings[extensionName] = { ...defaultSettings };
+        }
+
         startChatObserver();
         setTimeout(processChatMessages, 1000);
         console.log('[img-router] Ready.');
