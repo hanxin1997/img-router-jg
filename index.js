@@ -733,12 +733,12 @@ function initFabDrag(fabElement) {
         isDragging = false;
         fabElement.style.cursor = 'grab';
         fabElement.style.transition = 'transform 0.2s, box-shadow 0.2s';
-        
-        if (e.type === 'touchend' && !hasMoved) { 
-            e.preventDefault(); 
-            toggleModal(); 
+
+        if (e.type === 'touchend' && !hasMoved) {
+            e.preventDefault();
+            showSettingsModal();
         }
-        
+
         setTimeout(() => fabElement.dataset.dragging = 'false', 100);
     }
 
