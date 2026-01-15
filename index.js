@@ -780,7 +780,7 @@ jQuery(async () => {
     } catch (error) { console.error(error); }
 });
 
-// 显示设置弹窗（参考 mobile-main 的实现方式）
+// 显示设置弹窗
 function showSettingsModal() {
     // 如果已存在，先移除
     const existingModal = document.getElementById('img-router-settings-modal');
@@ -789,38 +789,29 @@ function showSettingsModal() {
         return; // 点击关闭
     }
 
-    // 创建弹窗容器
-    const modal = document.createElement('div');
+    // 创建弹窗容器 - 使用 dialog 元素，浏览器会自动处理层级
+    const modal = document.createElement('dialog');
     modal.id = 'img-router-settings-modal';
     modal.style.cssText = `
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        z-index: 999999;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
-        box-sizing: border-box;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 500px;
+        max-height: 85vh;
         overflow-y: auto;
+        background: var(--SmartThemeBlurTintColor, #1a1a2e);
+        border-radius: 12px;
+        border: 1px solid var(--SmartThemeBorderColor, #444);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        color: var(--SmartThemeBodyColor, #fff);
+        padding: 0;
+        margin: 0;
     `;
 
     modal.innerHTML = `
-        <div id="img-router-settings-content" style="
-            background: var(--SmartThemeBlurTintColor, #1a1a2e);
-            border-radius: 12px;
-            width: 100%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            border: 1px solid var(--SmartThemeBorderColor, #444);
-            color: var(--SmartThemeBodyColor, #fff);
-            position: relative;
-        ">
+        <div style="padding: 20px; position: relative;">
             <button id="img-router-close-btn" style="
                 position: absolute;
                 top: 10px;
@@ -836,105 +827,108 @@ function showSettingsModal() {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                z-index: 10;
             ">✕</button>
 
-            <div style="padding: 20px;">
-                <h3 style="margin: 0 0 20px 0;">🎨 图像生成器 <span style="font-size: 0.6em; opacity: 0.7;">v2.4.0</span></h3>
+            <h3 style="margin: 0 0 20px 0; padding-right: 40px;">🎨 图像生成器 <span style="font-size: 0.6em; opacity: 0.7;">v2.4.0</span></h3>
 
-                <div class="img-router-section" style="display:flex; align-items:center; justify-content:space-between; background:rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                    <span style="font-weight:bold;">启用聊天内联生成</span>
-                    <input type="checkbox" id="img-router-enable-inline" checked style="width: 20px; height: 20px;">
-                </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                <span style="font-weight:bold;">启用聊天内联生成</span>
+                <input type="checkbox" id="img-router-enable-inline" checked style="width: 20px; height: 20px;">
+            </div>
 
-                <div class="img-router-section" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 10px 0;">🔗 API 配置</h4>
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 5px;">服务器地址</label>
-                        <input type="text" id="img-router-api-url" placeholder="http://127.0.0.1:10001" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box;">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 5px;">访问令牌</label>
-                        <input type="text" id="img-router-api-key" placeholder="请输入 accessToken" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box;">
-                        <small style="opacity: 0.7; display: block; margin-top: 4px;">请在 img-router 管理后台创建访问令牌</small>
-                    </div>
-                    <button id="img-router-test-connection" class="menu_button" style="padding: 8px 16px; cursor: pointer;">测试连接</button>
-                    <span id="img-router-connection-status" style="margin-left: 10px;"></span>
+            <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                <h4 style="margin: 0 0 10px 0;">🔗 API 配置</h4>
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px;">服务器地址</label>
+                    <input type="text" id="img-router-api-url" placeholder="http://127.0.0.1:10001" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box; font-size: 16px;">
                 </div>
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px;">访问令牌</label>
+                    <input type="text" id="img-router-api-key" placeholder="请输入 accessToken" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box; font-size: 16px;">
+                    <small style="opacity: 0.7; display: block; margin-top: 4px;">请在 img-router 管理后台创建访问令牌</small>
+                </div>
+                <button id="img-router-test-connection" class="menu_button" style="padding: 8px 16px; cursor: pointer;">测试连接</button>
+                <span id="img-router-connection-status" style="margin-left: 10px;"></span>
+            </div>
 
-                <div class="img-router-section" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                    <h4 style="margin: 0 0 10px 0;">⚙️ 生成设置</h4>
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 5px;">提示词前缀</label>
-                        <textarea id="img-router-prefix" rows="2" placeholder="例如: high quality, masterpiece, 8k" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box; resize: vertical;"></textarea>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 5px;">模型</label>
-                        <select id="img-router-model" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff;">
-                            <option value="">默认 (自动)</option>
-                            <optgroup label="火山引擎">
-                                <option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option>
-                                <option value="doubao-seedream-4-0-250828">doubao-seedream-4-0-250828</option>
-                            </optgroup>
-                            <optgroup label="Gitee">
-                                <option value="z-image-turbo">z-image-turbo</option>
-                                <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: block; margin-bottom: 5px;">尺寸</label>
-                        <select id="img-router-size" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff;">
-                            <option value="">默认</option>
-                            <option value="512x512">512x512</option>
-                            <option value="768x768">768x768</option>
-                            <option value="1024x1024">1024x1024</option>
-                        </select>
-                    </div>
-                    <label style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="img-router-stream" checked>
-                        流式响应
-                    </label>
+            <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                <h4 style="margin: 0 0 10px 0;">⚙️ 生成设置</h4>
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px;">提示词前缀</label>
+                    <textarea id="img-router-prefix" rows="2" placeholder="例如: high quality, masterpiece, 8k" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box; resize: vertical; font-size: 16px;"></textarea>
                 </div>
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px;">模型</label>
+                    <select id="img-router-model" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; font-size: 16px;">
+                        <option value="">默认 (自动)</option>
+                        <optgroup label="火山引擎">
+                            <option value="doubao-seedream-4-5-251128">doubao-seedream-4-5-251128</option>
+                            <option value="doubao-seedream-4-0-250828">doubao-seedream-4-0-250828</option>
+                        </optgroup>
+                        <optgroup label="Gitee">
+                            <option value="z-image-turbo">z-image-turbo</option>
+                            <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px;">尺寸</label>
+                    <select id="img-router-size" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; font-size: 16px;">
+                        <option value="">默认</option>
+                        <option value="512x512">512x512</option>
+                        <option value="768x768">768x768</option>
+                        <option value="1024x1024">1024x1024</option>
+                    </select>
+                </div>
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="img-router-stream" checked>
+                    流式响应
+                </label>
+            </div>
 
-                <div class="img-router-section" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h4 style="margin: 0;">🖼️ 参考图片</h4>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9em;">
-                                <input type="checkbox" id="img-router-fix-ref"> 固定
-                            </label>
-                            <small id="img-router-clear-images" style="cursor: pointer; color: #f44336; display: none;">清除</small>
-                        </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0;">🖼️ 参考图片</h4>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9em;">
+                            <input type="checkbox" id="img-router-fix-ref"> 固定
+                        </label>
+                        <small id="img-router-clear-images" style="cursor: pointer; color: #f44336; display: none;">清除</small>
                     </div>
-                    <label id="img-router-upload-area" style="display: block; border: 2px dashed #555; padding: 20px; text-align: center; border-radius: 6px; cursor: pointer;">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2em; margin-bottom: 5px; display: block;"></i>
-                        <p style="margin: 0;">点击或拖拽上传图片</p>
-                    </label>
-                    <input type="file" id="img-router-file-input" accept="image/*" multiple style="display: none;">
-                    <div id="img-router-preview-container" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;"></div>
                 </div>
+                <label id="img-router-upload-area" style="display: block; border: 2px dashed #555; padding: 20px; text-align: center; border-radius: 6px; cursor: pointer;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2em; margin-bottom: 5px; display: block;"></i>
+                    <p style="margin: 0;">点击或拖拽上传图片</p>
+                </label>
+                <input type="file" id="img-router-file-input" accept="image/*" multiple style="display: none;">
+                <div id="img-router-preview-container" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;"></div>
+            </div>
 
-                <div class="img-router-section" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h4 style="margin: 0;">📜 历史生成</h4>
-                        <small id="img-router-clear-history" style="cursor: pointer; color: #f44336;">清空</small>
-                    </div>
-                    <div id="img-router-history-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 10px; max-height: 150px; overflow-y: auto;"></div>
+            <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="margin: 0;">📜 历史生成</h4>
+                    <small id="img-router-clear-history" style="cursor: pointer; color: #f44336;">清空</small>
                 </div>
+                <div id="img-router-history-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 10px; max-height: 150px; overflow-y: auto;"></div>
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    // 绑定关闭按钮
-    document.getElementById('img-router-close-btn').onclick = () => modal.remove();
+    // 使用 showModal() 方法打开，这会自动处理层级和焦点
+    modal.showModal();
 
-    // 点击背景关闭
-    modal.onclick = (e) => {
-        if (e.target === modal) modal.remove();
-    };
+    // 绑定关闭按钮
+    document.getElementById('img-router-close-btn').onclick = () => modal.close();
+
+    // 点击背景关闭（dialog 的 ::backdrop）
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.close();
+    });
+
+    // 关闭时移除元素
+    modal.addEventListener('close', () => modal.remove());
 
     // 加载设置并绑定事件
     loadSettings();
