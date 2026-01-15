@@ -13,7 +13,7 @@
     justify-content: center !important;
     align-items: center !important;
     cursor: grab !important;
-    z-index: 9999 !important; /* 降低 z-index，避免移动端兼容性问题 */
+    z-index: 99999 !important;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
     transition: transform 0.2s, box-shadow 0.2s !important;
     user-select: none !important;
@@ -22,8 +22,8 @@
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
-    -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
-    touch-action: none; /* 防止触摸事件被浏览器拦截 */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
 }
 
 #img-router-fab:hover {
@@ -52,14 +52,14 @@
     background: rgba(0, 0, 0, 0.5) !important;
     backdrop-filter: blur(3px) !important;
     -webkit-backdrop-filter: blur(3px) !important;
-    z-index: 10000 !important; /* 比 FAB 高一点 */
+    z-index: 100000 !important;
     display: none !important;
     justify-content: center !important;
     align-items: flex-start !important;
     padding: 16px !important;
     box-sizing: border-box !important;
     overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch; /* iOS 滚动优化 */
+    -webkit-overflow-scrolling: touch;
 }
 
 #img-router-modal-overlay.active {

@@ -596,7 +596,7 @@ function injectCustomStyles() {
         #img-router-modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
-            z-index: 10000;
+            z-index: 100000;
             display: none;
             align-items: flex-start;
             justify-content: center;
@@ -820,7 +820,7 @@ jQuery(async () => {
         const fab = document.createElement('button');
         fab.id = 'img-router-fab';
         fab.innerHTML = '<i class="fa-solid fa-images"></i>';
-        fab.style.cssText = `position: fixed; bottom: 150px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; cursor: grab; z-index: 9999; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); border: none; color: white; font-size: 24px; -webkit-tap-highlight-color: transparent; touch-action: none;`;
+        fab.style.cssText = `position: fixed; bottom: 150px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; cursor: grab; z-index: 99999; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); border: none; color: white; font-size: 24px; -webkit-tap-highlight-color: transparent; touch-action: none;`;
         document.body.appendChild(fab);
 
         const modalOverlay = document.createElement('div');
