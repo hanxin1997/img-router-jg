@@ -23,7 +23,8 @@ const defaultSettings = {
     referenceImages: [],
     generatedHistory: [],
     fixReferenceImages: false,
-    enableInline: true
+    enableInline: true,
+    promptImageCache: {} // prompt -> imageUrl 缓存，用于刷新后恢复图片
 };
 
 // State
@@ -423,6 +424,31 @@ function extractImageFromContent(content) {
 
 // ================= 聊天内联交互逻辑 =================
 
+// 生成 prompt 的缓存 key（去除空白和特殊字符，取前100字符）
+function getPromptCacheKey(prompt) {
+    return prompt.replace(/<br\s*\/?>/gi, '\n').replace(/&[^;]+;/g, '').replace(/\s+/g, ' ').trim().substring(0, 100);
+}
+
+// 保存 prompt -> imageUrl 到缓存
+function cachePromptImage(prompt, imageUrl) {
+    const cache = extension_settings[extensionName].promptImageCache || {};
+    const key = getPromptCacheKey(prompt);
+    cache[key] = imageUrl;
+    // 限制缓存大小，最多保存 50 条
+    const keys = Object.keys(cache);
+    if (keys.length > 50) {
+        delete cache[keys[0]];
+    }
+    saveSetting('promptImageCache', cache);
+}
+
+// 从缓存获取图片
+function getCachedImage(prompt) {
+    const cache = extension_settings[extensionName].promptImageCache || {};
+    const key = getPromptCacheKey(prompt);
+    return cache[key] || null;
+}
+
 function processChatMessages() {
     const isEnabled = extension_settings[extensionName]?.enableInline ?? true;
     const chat = getContext().chat;
@@ -431,11 +457,13 @@ function processChatMessages() {
     $('#chat .mes').each(function() {
         const messageElement = $(this);
         const textContainer = messageElement.find('.mes_text');
-        
+
         if (!isEnabled) return;
 
         const html = textContainer.html();
-        const hasPlaceholder = /image###([\s\S]+?)###/.test(html);
+        // 适配多种格式：image###...### 或 image###<br>...<br>###
+        // 使用更宽松的正则，匹配 image### 开头到 ### 结尾（中间可以有任何内容包括 <br>）
+        const hasPlaceholder = /image###([\s\S]*?)###/.test(html);
 
         if (!hasPlaceholder) {
             if (textContainer.find('.img-router-inline-trigger, .img-router-inline-result').length > 0) {
@@ -444,11 +472,37 @@ function processChatMessages() {
             return;
         }
 
-        const regex = /image###([\s\S]+?)###/g;
+        // 匹配 image### 和 ### 之间的内容（包括换行和 <br> 标签）
+        const regex = /image###([\s\S]*?)###/g;
 
         const newHtml = html.replace(regex, (match, prompt) => {
-            const safePrompt = prompt.replace(/"/g, '&quot;');
-            return `<span class="img-router-inline-trigger" data-prompt="${safePrompt}" title="点击生成: ${safePrompt}">[生成图片]</span>`;
+            // 清理 prompt：移除 <br> 标签，转换 HTML 实体
+            const cleanPrompt = prompt
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .trim();
+
+            // 检查缓存中是否已有生成的图片
+            const cachedImage = getCachedImage(cleanPrompt);
+            if (cachedImage) {
+                // 已有缓存，直接显示图片
+                return `
+                    <div class="img-router-inline-result">
+                        <img src="${cachedImage}" class="zoomable" onclick="clickZoom(this)" alt="已生成图片" />
+                        <div class="img-router-inline-actions">
+                            <i class="fa-solid fa-download" title="下载" onclick="event.stopPropagation(); const a = document.createElement('a'); a.href='${cachedImage}'; a.download='gen_${Date.now()}.png'; a.click();"></i>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 没有缓存，显示生成按钮
+            const safePrompt = cleanPrompt.replace(/"/g, '&quot;');
+            return `<span class="img-router-inline-trigger" data-prompt="${safePrompt}" title="点击生成图片">[生成图片]</span>`;
         });
 
         if (newHtml !== html) {
@@ -477,6 +531,7 @@ function bindInlineEvents(container) {
                 const imageUrl = extractImageFromContent(content);
                 if (imageUrl) {
                     addToHistory(imageUrl, prompt);
+                    cachePromptImage(prompt, imageUrl); // 缓存 prompt -> imageUrl，刷新后可恢复
                     const imgHtml = `
                         <div class="img-router-inline-result">
                             <img src="${imageUrl}" class="zoomable" onclick="clickZoom(this)" alt="${prompt}" />
@@ -486,7 +541,7 @@ function bindInlineEvents(container) {
                         </div>
                     `;
                     trigger.replaceWith(imgHtml);
-                    saveSettingsDebounced(); 
+                    saveSettingsDebounced();
                     toastr.success('生成成功，已保存');
                 } else {
                     throw new Error('无法解析图片数据');
@@ -528,7 +583,7 @@ function startChatObserver() {
 function injectCustomStyles() {
     if (document.getElementById('img-router-injected-style')) return;
     const css = `
-        .img-router-inline-trigger { color: #3b82f6; font-weight: bold; cursor: pointer; text-decoration: underline; margin: 0 4px; }
+        .img-router-inline-trigger { color: #3b82f6; font-weight: bold; cursor: pointer; text-decoration: underline; margin: 0 4px; -webkit-tap-highlight-color: transparent; }
         .img-router-inline-trigger:hover { color: #60a5fa; }
         .img-router-loading { color: var(--SmartThemeQuoteColor); font-size: 0.9em; cursor: wait; }
         .img-router-inline-result { display: inline-block; position: relative; margin: 10px 0; max-width: 100%; }
@@ -537,34 +592,35 @@ function injectCustomStyles() {
         .img-router-inline-result:hover .img-router-inline-actions { opacity: 1; }
         .img-router-inline-actions i { color: white; cursor: pointer; font-size: 14px; padding: 2px; }
         .img-router-inline-actions i:hover { color: #3b82f6; }
-        
-        #img-router-modal-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); 
-            z-index: 2147483646; 
-            display: none; 
-            display: flex;
-            align-items: flex-start; 
+
+        #img-router-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+            z-index: 10000;
+            display: none;
+            align-items: flex-start;
             justify-content: center;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
             padding: 16px;
             box-sizing: border-box;
         }
-        #img-router-modal-overlay:not(.active) { display: none !important; }
-        
-        #img-router-modal { 
-            background: var(--SmartThemeBlurTintColor, #1a1a2e); 
-            border-radius: 12px; 
-            width: 90%; 
-            max-width: 550px; 
+        #img-router-modal-overlay.active { display: flex !important; }
+
+        #img-router-modal {
+            background: var(--SmartThemeBlurTintColor, #1a1a2e);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 550px;
             max-height: calc(100vh - 32px);
             overflow-y: auto;
-            margin: 0; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
-            border: 1px solid var(--SmartThemeBorderColor, #444); 
-            position: relative; 
-            display: flex; 
-            flex-direction: column; 
+            -webkit-overflow-scrolling: touch;
+            margin: 0;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            border: 1px solid var(--SmartThemeBorderColor, #444);
+            position: relative;
+            display: flex;
+            flex-direction: column;
             color: var(--SmartThemeBodyColor, #fff);
             flex-shrink: 0;
         }
@@ -574,7 +630,7 @@ function injectCustomStyles() {
         .img-router-section h4 { margin: 0 0 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; font-size: 1em; }
         .img-router-field { margin-bottom: 10px; }
         .img-router-field label { display: block; font-size: 0.9em; margin-bottom: 4px; opacity: 0.9; }
-        .img-router-input { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--SmartThemeBorderColor, #555); background: var(--SmartThemeEmColor, #222); color: var(--SmartThemeBodyColor, #fff); box-sizing: border-box; }
+        .img-router-input { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--SmartThemeBorderColor, #555); background: var(--SmartThemeEmColor, #222); color: var(--SmartThemeBodyColor, #fff); box-sizing: border-box; font-size: 16px; }
         .img-router-preview-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
         .img-router-preview-item { width: 60px; height: 60px; position: relative; border-radius: 4px; overflow: hidden; border: 1px solid #555; }
         .img-router-preview-item img { width: 100%; height: 100%; object-fit: cover; }
@@ -590,11 +646,10 @@ function injectCustomStyles() {
         .history-actions i:hover { color: #3b82f6; }
 
         #img-router-modal-close { top: 8px; right: 8px; }
-        
+
         @media (max-width: 768px) {
             #img-router-modal { width: 95%; }
             #img-router-modal-close { top: 8px; right: 8px; }
-            .img-router-input { font-size: 16px; }
         }
     `;
     const style = document.createElement('style');
@@ -765,7 +820,7 @@ jQuery(async () => {
         const fab = document.createElement('button');
         fab.id = 'img-router-fab';
         fab.innerHTML = '<i class="fa-solid fa-images"></i>';
-        fab.style.cssText = `position: fixed; bottom: 150px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; cursor: grab; z-index: 2147483647; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); border: none; color: white; font-size: 24px;`;
+        fab.style.cssText = `position: fixed; bottom: 150px; left: 20px; width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; justify-content: center; align-items: center; cursor: grab; z-index: 9999; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); border: none; color: white; font-size: 24px; -webkit-tap-highlight-color: transparent; touch-action: none;`;
         document.body.appendChild(fab);
 
         const modalOverlay = document.createElement('div');
