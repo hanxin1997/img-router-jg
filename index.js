@@ -699,10 +699,35 @@ function setupEventHandlers() {
 function toggleModal() {
     const overlay = document.getElementById('img-router-modal-overlay');
     if (overlay) {
-        if (overlay.classList.contains('active')) {
-            overlay.classList.remove('active');
-        } else {
+        const isOpening = !overlay.classList.contains('active');
+
+        if (isOpening) {
+            // 打开 modal 时，临时隐藏可能遮挡的酒馆 UI 元素
+            const elementsToHide = [
+                '#top-bar',
+                '#sheld',
+                '#left-nav-panel',
+                '#right-nav-panel',
+                '.drawer-content',
+                '#floatingPrompt',
+                '#send_form',
+                '#form_sheld'
+            ];
+            elementsToHide.forEach(selector => {
+                const el = document.querySelector(selector);
+                if (el) {
+                    el.dataset.imgRouterHidden = el.style.visibility || '';
+                    el.style.visibility = 'hidden';
+                }
+            });
             overlay.classList.add('active');
+        } else {
+            // 关闭 modal 时，恢复隐藏的元素
+            document.querySelectorAll('[data-img-router-hidden]').forEach(el => {
+                el.style.visibility = el.dataset.imgRouterHidden || '';
+                delete el.dataset.imgRouterHidden;
+            });
+            overlay.classList.remove('active');
         }
     }
 }
@@ -934,12 +959,19 @@ jQuery(async () => {
         `;
         document.body.appendChild(modalOverlay);
 
-        fab.addEventListener('click', function() { 
-            if (this.dataset.dragging !== 'true') toggleModal(); 
+        fab.addEventListener('click', function() {
+            if (this.dataset.dragging !== 'true') toggleModal();
         });
-        
-        document.getElementById('img-router-modal-close').onclick = (e) => { e.preventDefault(); e.stopPropagation(); modalOverlay.classList.remove('active'); };
-        modalOverlay.onclick = (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('active'); };
+
+        // 关闭按钮和点击遮罩层都调用 toggleModal 以正确恢复隐藏的元素
+        document.getElementById('img-router-modal-close').onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleModal();
+        };
+        modalOverlay.onclick = (e) => {
+            if (e.target === modalOverlay) toggleModal();
+        };
 
         initFabDrag(fab);
         initModalDrag();
